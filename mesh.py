@@ -1,7 +1,7 @@
 import cv2 as cv
 import numpy as np
 
-OUTPUT_DIR = "/home/chaneylc/Desktop/Test"
+OUTPUT_DIR = r"C:\Users\marven\Documents\Spring-2020\CIS690"
 
 #input is image using first-version soybeans mesh
 #threshold function to find 3d printed mesh from an RGB image 1980x2592
@@ -30,7 +30,7 @@ def threshold(src):
     rgb = cv.cvtColor(lab, cv.COLOR_LAB2RGB)
 
     #Debug statements to visualize the image outpu
-    cv.imwrite("{}/Mesh.jpg".format(OUTPUT_DIR), rgb)
+    cv.imwrite("{}\Mesh.jpg".format(OUTPUT_DIR), rgb)
 
     return rgb
 
@@ -56,7 +56,7 @@ def replaceChannelValue(src, channelIndex, lo, hi, value):
 if __name__ == "__main__":
 
 	#read the input file
-	src = cv.imread("{}/IMG.jpg".format(OUTPUT_DIR))
+	src = cv.imread("{}\IMG.jpg".format(OUTPUT_DIR))
 
 	#create a mask image 'dst' of the mesh
 	dst = threshold(src)
@@ -64,7 +64,7 @@ if __name__ == "__main__":
 	#subtract the mesh from the original using opencv saturation subtract
 	sub = cv.subtract(dst, src)
 
-	cv.imwrite("{}/Subtracted.jpg".format(OUTPUT_DIR), sub)
+	cv.imwrite("{}\Subtracted.jpg".format(OUTPUT_DIR), sub)
 
 	#convert the image to grayscale
 	gray = cv.cvtColor(sub, cv.COLOR_RGB2GRAY)
@@ -72,6 +72,14 @@ if __name__ == "__main__":
 	#final threshold on gray image to segment seeds from background and mesh mask
 	ret, gray = cv.threshold(gray, 100, 255, cv.THRESH_BINARY)
 
-	cv.imwrite("{}/Threshed.jpg".format(OUTPUT_DIR), gray)
-
+	cv.imwrite("{}\Threshed.jpg".format(OUTPUT_DIR), gray)
+        
 	#find contours, area threshold, count
+	edged = cv.Canny(gray, 30, 200)       
+	cv.imshow('canny edge', edged)
+	cv.waitKey(0)    
+	contours, hierarchy = cv.findContours(edged,cv.RETR_TREE,cv.CHAIN_APPROX_SIMPLE)
+	cv.drawContours(edged, contours, -1, (0, 255, 0), 3)
+	cv.imshow('contours', edged)
+	cv.waitKey(0)    
+	cv.imwrite("{}\Threshed_Contours.jpg".format(OUTPUT_DIR), edged)    

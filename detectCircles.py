@@ -3,7 +3,8 @@ import numpy as np
 import math
 from collections import defaultdict
 
-OUTPUT_DIR = "/home/chaneylc/Desktop/Circles"
+#OUTPUT_DIR = "/home/chaneylc/Desktop/Circles"
+OUTPUT_DIR = r"C:\Users\marven\Documents\Spring-2020\CIS690\MeshCount"
 
 #input is image using first-version soybeans mesh
 #threshold function to find 3d printed mesh from an RGB image 1980x2592
@@ -32,7 +33,7 @@ def threshold(src):
     rgb = cv.cvtColor(lab, cv.COLOR_LAB2RGB)
 
     #Debug statements to visualize the image outpu
-    cv.imwrite("{}/Mesh.jpg".format(OUTPUT_DIR), rgb)
+    cv.imwrite("{}\Mesh.jpg".format(OUTPUT_DIR), rgb)
 
     return rgb
 
@@ -77,20 +78,20 @@ def circularity(area, perimeter):
 if __name__ == "__main__":
 
 	#read the input file
-	src = cv.imread("{}/IMG3.jpg".format(OUTPUT_DIR), 0)
+	src = cv.imread("{}\IMG3.jpg".format(OUTPUT_DIR), 0)
 
-	cv.imwrite("{}/Gray.png".format(OUTPUT_DIR), src)
+	cv.imwrite("{}\Gray.png".format(OUTPUT_DIR), src)
 
 	output = src.copy()
 
 	edges = cv.Canny(src, threshold1=240, threshold2=255)
 
-	cv.imwrite("{}/Edges.png".format(OUTPUT_DIR), edges)
+	cv.imwrite("{}\Edges.png".format(OUTPUT_DIR), edges)
 
 	edges_smoothed = cv.GaussianBlur(edges, ksize=(5,5), sigmaX=10)
 
 	contours, _ = cv.findContours(edges_smoothed, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
-	
+
 	print(len(contours))
 
 	#assume that there will be four equally sized coins that are bigger than the measured seeds
@@ -110,6 +111,8 @@ if __name__ == "__main__":
 
 		coinKeys = sortedKeys[:4]
 
+		print(len(sortedKeys))        
+
 		circularities = []
 
 		for k in coinKeys:
@@ -124,6 +127,8 @@ if __name__ == "__main__":
 		mean = sum(circularities) / float(len(circularities))
 
 		variance = 0
+        
+		print(circularities)        
 
 		for value in circularities:
 
@@ -145,13 +150,16 @@ if __name__ == "__main__":
 
 			center = (int(x), int(y))
 
-			cv.circle(output, center, int(radius), (255,0,0), 3)
+			#cv.circle(output, center, int(radius), (255,0,0), 3)
 
 			M = cv.moments(contour)
 			cX = int(M["m10"] / M["m00"])
 			cY = int(M["m01"] / M["m00"])
 
-			approx = cv.approxPolyDP(contour,0.001*perimeter,True)
+            # Setting the epsilon calculation to 0.0001 since it gives the most precise   #approximation value. Going lower doesn't improve the precision of the values anymore.
+			approx = cv.approxPolyDP(contour,0.0001*perimeter,True)
+            
+			print("appr: {}".format(len(approx)))            
 
 			circularity = 4 * (math.pi) * (area / (perimeter**2))
 
@@ -171,7 +179,7 @@ if __name__ == "__main__":
 	#     # draw the center of the circle
 	#     cv.circle(output,(i[0],i[1]),2,(255,255,255),3)
 
-	cv.imwrite("{}/Detected.png".format(OUTPUT_DIR), output)
+	cv.imwrite("{}\Detected.png".format(OUTPUT_DIR), output)
 
 	#cv.imwrite("{}/Detected2.png".format(OUTPUT_DIR), circleDetect(src.copy()))
 	# #create a mask image 'dst' of the mesh
