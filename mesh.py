@@ -3,9 +3,8 @@ import numpy as np
 from collections import defaultdict
 import itertools
 import math
-
-
-OUTPUT_DIR = r"C:\Users\marven\Documents\Spring-2020\CIS690"
+import random as rng
+OUTPUT_DIR = "/home/chaneylc/Desktop/MeshCount/" #sys.argv[0] #r"C:\Users\marven\Documents\Spring-2020\CIS690"
 
 #input is image using first-version soybeans mesh
 #threshold function to find 3d printed mesh from an RGB image 1980x2592
@@ -17,7 +16,7 @@ def threshold(src):
 
     #LAB threshold ranges that was found manually to work with
     #the lightbox
-    L = [(0,90),(0,255),(0,255)]
+    L = [(0,108),(0,255),(0,255)]
 
     #use numpy logical and to find all pixels that satify the LAB range for each channel
     L_range = np.logical_and(L[0][0] < lab[:,:,0], lab[:,:,0] < L[0][1])
@@ -40,7 +39,7 @@ def threshold(src):
     #_, bin_img = cv.threshold(eroded_rgb, 100, 255, cv.THRESH_BINARY)
 
     #Debug statements to visualize the image outpu
-    cv.imwrite("{}\Mesh.jpg".format(OUTPUT_DIR), rgb)
+    cv.imwrite("{}/Mesh.jpg".format(OUTPUT_DIR), rgb)
 
     return rgb
 
@@ -66,7 +65,7 @@ def replaceChannelValue(src, channelIndex, lo, hi, value):
 if __name__ == "__main__":
 
 	#read the input file
-	src = cv.imread("{}\IMG.jpg".format(OUTPUT_DIR))
+	src = cv.imread("{}/Mesh_IMG.jpg".format(OUTPUT_DIR))
     
 	src_copy = src.copy()
     
@@ -75,18 +74,20 @@ if __name__ == "__main__":
 	dst = threshold(src)    
     
 	#subtract the mesh from the original using opencv saturation subtract
-	sub = cv.subtract(dst, src)
+	# sub = cv.subtract(dst, src)
 
-	cv.imwrite("{}\Subtracted.jpg".format(OUTPUT_DIR), sub)
+	# cv.imwrite("{}/Subtracted.jpg".format(OUTPUT_DIR), sub)
     
-	rep_sub = replaceChannelValue(sub, 2, 0, 255, 255)    
+	# rep_sub = replaceChannelValue(sub, 2, 0, 255, 255)    
 
 	#convert the image to grayscale
-	gray = cv.cvtColor(rep_sub, cv.COLOR_RGB2GRAY)
+	gray = cv.cvtColor(dst, cv.COLOR_RGB2GRAY)
     
-	cv.imwrite("{}\gray_scale.jpg".format(OUTPUT_DIR), gray)
-    
+	cv.imwrite("{}/gray_scale.jpg".format(OUTPUT_DIR), gray)
 
+	blur = cv.medianBlur(gray, 9)
+
+	cv.imwrite("{}/blur.png".format(OUTPUT_DIR), blur)
 	#final threshold on gray image to segment seeds from background and mesh mask
 	#ret, gray = cv.threshold(gray, 100, 255, cv.THRESH_BINARY)
 
@@ -95,68 +96,33 @@ if __name__ == "__main__":
 	#color = cv.cvtColor(gray,cv.COLOR_GRAY2RGB)    
         
 	#find contours, area threshold, count
-	edges = cv.Canny(gray, threshold1=240, threshold2=255)
+	edges = cv.Canny(blur, threshold1=200, threshold2=255)
     
-	edges_smoothed = cv.GaussianBlur(edges, ksize=(5,5), sigmaX=10)
+	cv.imwrite("{}/edges.png".format(OUTPUT_DIR), edges)
     
-	kernel = np.ones((5,5), np.uint8) 
-    
-	#edges_smoothed = cv.erode(edges_smoothed, kernel) 
-    
-	edges_smoothed = cv.morphologyEx(edges_smoothed, cv.MORPH_CLOSE, kernel)
-    
-	orig_edges_smoothed = edges_smoothed.copy()  
-    
-    
-    
-	contours, hierarchy = cv.findContours(edges_smoothed,cv.RETR_TREE,cv.CHAIN_APPROX_SIMPLE)
-    
-	contourCount = 0
-    
-	centerMap = defaultdict(int)
-        
-    
-	for contour in contours:
+	contours, hierarchy = cv.findContours(edges,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE)
+     
+	print(len(contours)) 
+	r = 100
+	g = 100
+	b = 100   
+	for index, contour in enumerate(contours):
         
 		perimeter = cv.arcLength(contour, True)
-                
+		print(cv.contourArea(contour))        
 		if(cv.contourArea(contour) > 1000):   
                     
-			cv.drawContours(edges_smoothed, [contour], -1, (255, 255, 255), 3)
+			cv.drawContours(src_copy, [contour], -1, (r, g, b), -1)
             
 			(x,y),radius = cv.minEnclosingCircle(contour)
 
 			center = (int(x), int(y))
-                        
-			centerMap[center] = contour
-            
-			contourCount += 1                                
-    
-	#cv.imwrite("{}\init_contours.jpg".format(OUTPUT_DIR), edges_smoothed)     
-    
 
-    
-	res = cv.subtract(edges_smoothed, orig_edges_smoothed)
-    
-	res_copy = res.copy()    
-    
-	cv.imwrite("{}\subtract_res.jpg".format(OUTPUT_DIR), res)     
-    
-	for a, b in itertools.combinations(centerMap.keys(), 2):
-		dist = math.sqrt( (a[0] - a[1])**2 + (b[0] - b[1])**2 )
-		print(dist)
-        if(dist < 1000 and a in centerMap.keys()):
-			del centerMap[a]            
-    
-	#for cnt in centerMap.keys():    
-		#cv.drawContours(orig_edges_smoothed, [centerMap[cnt]], -1, (255, 255, 255), 3) 
-        
-		#orig_edges_smoothed = cv.dilate(orig_edges_smoothed, (3, 3), iterations = 2)    
-        
-        
-	final = cv.subtract(res, orig_edges_smoothed)        
-                  
-    #res = cv.dilate(res, (5, 5), iterations = 5)     
+			cv.putText(src_copy, "{}".format(index+1), center, cv.FONT_HERSHEY_SIMPLEX, 4, (0,0,0), 4,cv.LINE_AA)
 
-	cv.imwrite("{}\Threshed_Contours.jpg".format(OUTPUT_DIR), final)
-	cv.imwrite("{}\orig_edges_smoothed.jpg".format(OUTPUT_DIR), res_copy)       
+			r = rng.randint(0, 255)
+			g = rng.randint(0, 255)
+			b = rng.randint(0, 255)
+
+
+	cv.imwrite("{}/init_contours.jpg".format(OUTPUT_DIR), src_copy)     
