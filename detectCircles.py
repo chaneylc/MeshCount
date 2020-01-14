@@ -3,8 +3,30 @@ import numpy as np
 import math
 from collections import defaultdict
 
-#OUTPUT_DIR = "/home/chaneylc/Desktop/Circles"
-OUTPUT_DIR = r"C:\Users\marven\Documents\Spring-2020\CIS690\MeshCount"
+
+"""
+Average soybean diameter: 5-7mm
+
+Soybean sampled for skewness error: ~6mm in diameter
+
+pi*r^2 = area in mm
+
+area = ~28.2743338823mm
+
+diameter of penny = 18.9mm
+
+area of penny = 280.552077947mm
+
+area of soybean mm / area of soybean pix = 0.00148839701
+
+area of penny mm / area of penny pix = 0.00203227919
+"""
+
+OUTPUT_DIR = "/home/chaneylc/Desktop/MeshCount/"
+#OUTPUT_DIR = r"C:\Users\marven\Documents\Spring-2020\CIS690\MeshCount"
+
+def writeImg(name, img):
+	cv.imwrite("{}/{}".format(OUTPUT_DIR, name), img)
 
 #input is image using first-version soybeans mesh
 #threshold function to find 3d printed mesh from an RGB image 1980x2592
@@ -16,7 +38,7 @@ def threshold(src):
 
     #LAB threshold ranges that was found manually to work with
     #the lightbox
-    L = [(0,44),(0,255),(0,255)]
+    L = [(0,33),(0,255),(0,255)]
     
 
     #use numpy logical and to find all pixels that satify the LAB range for each channel
@@ -34,7 +56,7 @@ def threshold(src):
     rgb = cv.cvtColor(lab, cv.COLOR_LAB2RGB)
 
     #Debug statements to visualize the image outpu
-    cv.imwrite("{}\Mesh.jpg".format(OUTPUT_DIR), rgb)
+    writeImg("mesh.jpg", rgb)
 
     return rgb
 
@@ -56,38 +78,58 @@ def replaceChannelValue(src, channelIndex, lo, hi, value):
 
 	return dst
 
-def circleDetect(src):
+def calcVariance(values):
 
-	edges = cv.Canny(image=src, threshold1=240, threshold2=255)
-	edges_smoothed = cv.GaussianBlur(edges, ksize=(5,5), sigmaX=10)
-	lines = cv.HoughLinesP(edges_smoothed, rho=1, theta=1*np.pi/180, threshold=40, minLineLength=30, maxLineGap=25)
-	img_lines = cv.cvtColor(src.copy(), cv.COLOR_BGR2RGB)
-	line_nos = lines.shape[0]
-	for i in range(line_nos):
-	    x_1 = lines[i][0][0]
-	    y_1 = lines[i][0][1]    
-	    x_2 = lines[i][0][2]
-	    y_2 = lines[i][0][3]    
-	    cv.line(img_lines, pt1=(x_1,y_1), pt2=(x_2,y_2), color=(255,0,0), thickness=2)
-	return img_lines
+	mean = sum(values) / float(len(values))
 
-def  circularity(area, perimeter):
+	variance = 0
+    
+	for value in values:
+
+		variance += (value-mean)**2
+
+	variance /= len(values)
+
+	print(variance)
+
+	return variance
+
+def  calcCircularity(area, perimeter):
 
 	return 4 * (math.pi) * (area / (perimeter**2))
+
+#pi * r^2 = x
+#r = sqrt(x/pi)
+
+def measureArea(Cpx, Cmm, Kpx):
+
+	rmm = (Cmm / math.pi) ** (0.5)
+	rpx = (Cpx / math.pi) ** (0.5)
+	kpx = (Kpx / math.pi) ** (0.5)
+
+	kmm = (float(kpx) * float(rmm)) / float(rpx)
+
+	print(math.pi * (kmm ** 2))
+
+	return math.pi * (kmm ** 2)
 
 #driver code
 if __name__ == "__main__":
 
 	#read the input file
-	src = cv.imread("{}\IMG3.jpg".format(OUTPUT_DIR), 0)
+	src = cv.imread("{}/H.jpg".format(OUTPUT_DIR))
 
-	cv.imwrite("{}\Gray.png".format(OUTPUT_DIR), src)
+	writeImg("gray.png", src)
 
 	output = src.copy()
 
-	edges = cv.Canny(src, threshold1=240, threshold2=255)
+	src = threshold(src)
 
-	cv.imwrite("{}\Edges.png".format(OUTPUT_DIR), edges)
+	src = cv.cvtColor(src, cv.COLOR_RGB2GRAY)
+
+	edges = cv.Canny(src, threshold1=200, threshold2=255)
+
+	writeImg("edges.png", edges)
 
 	edges_smoothed = cv.GaussianBlur(edges, ksize=(5,5), sigmaX=10)
 
@@ -105,14 +147,16 @@ if __name__ == "__main__":
 		
 		areaMap[area] = contour
 
+	areaVariance = calcVariance(areaMap.keys())
+
 	#sort the keys by the area values, top 4 contours will be the coins
 	sortedKeys = sorted(areaMap, reverse=True)
 
 	if sortedKeys and len(sortedKeys) >= 4:
 
-		coinKeys = sortedKeys[:4]
+		coinGroundTruth = sortedKeys[0]
 
-		print(len(sortedKeys))        
+		coinKeys = sortedKeys[:]
 
 		circularities = []
 
@@ -122,22 +166,9 @@ if __name__ == "__main__":
 
 			perimeter = cv.arcLength(contour, True)
 
-			circularities.append(circularity(k, perimeter))
+			circularities.append(calcCircularity(k, perimeter))
 
-
-		mean = sum(circularities) / float(len(circularities))
-
-		variance = 0
-        
-		print(circularities)        
-
-		for value in circularities:
-
-			variance += (value-mean)**2
-
-		variance /= len(circularities)
-
-		print(variance)
+		circularityVariance = calcVariance(circularities)
 
 		for k in coinKeys:
 
@@ -145,30 +176,33 @@ if __name__ == "__main__":
 
 			area = cv.contourArea(contour)
 
-			perimeter = cv.arcLength(contour, True)
+			if area > 1000:
+				perimeter = cv.arcLength(contour, True)
 
-			(x, y), radius = cv.minEnclosingCircle(contour)
+				(x, y), radius = cv.minEnclosingCircle(contour)
 
-			center = (int(x), int(y))
+				center = (int(x), int(y))
 
-			#cv.circle(output, center, int(radius), (255,0,0), 3)
+				#cv.circle(output, center, int(radius), (255,0,0), 3)
 
-			M = cv.moments(contour)
-			cX = int(M["m10"] / M["m00"])
-			cY = int(M["m01"] / M["m00"])
+				M = cv.moments(contour)
+				cX = int(M["m10"] / M["m00"])
+				cY = int(M["m01"] / M["m00"])
 
-            # Setting the epsilon calculation to 0.0001 since it gives the most precise   
-            #approximation value. Going lower doesn't improve the precision of the values anymore.
-			approx = cv.approxPolyDP(contour,0.0001*perimeter,True)
-            
-			print("appr: {}".format(len(approx)))            
+	            # Setting the epsilon calculation to 0.0001 since it gives the most precise   
+	            #approximation value. Going lower doesn't improve the precision of the values anymore.
+				approx = cv.approxPolyDP(contour,0.0001*perimeter,True)
+	            
+				print("appr: {}".format(len(approx)))            
 
-			circularity = 4 * (math.pi) * (area / (perimeter**2))
+				circularity = 4 * (math.pi) * (area / (perimeter**2))
 
-			if circularity >= 0.8:
-				cv.putText(output,"{} : {}".format(str(circularity)[:5], area),(cX,cY-500), cv.FONT_HERSHEY_SIMPLEX, 4,(0,0,0),4,cv.LINE_AA)
+				#if circularity >= 0.1:
+				#cv.putText(output,"{} : {}".format(str(circularity)[:5], area),(cX,cY), cv.FONT_HERSHEY_SIMPLEX, 4,(0,0,0),4,cv.LINE_AA)
+				cv.putText(output,"{} : {}".format(str(measureArea(coinGroundTruth, 280.552077947, k))[:5], area),(cX,cY), cv.FONT_HERSHEY_SIMPLEX, 4,(0,0,0),4,cv.LINE_AA)
+
 				cv.drawContours(output, [approx], -1, (255,0,0), 2)
-                
+	            
 				x,y,w,h = cv.boundingRect(contours[0])
 				cv.rectangle(output,(x,y),(x+w,y+h),(0,255,0),2)
                 
@@ -185,8 +219,7 @@ if __name__ == "__main__":
 	#     # draw the center of the circle
 	#     cv.circle(output,(i[0],i[1]),2,(255,255,255),3)
 
-	cv.imwrite("{}\Detected.png".format(OUTPUT_DIR), output)
-
+	writeImg("detected.png", output)
 	#cv.imwrite("{}/Detected2.png".format(OUTPUT_DIR), circleDetect(src.copy()))
 	# #create a mask image 'dst' of the mesh
 	# dst = threshold(src)
@@ -242,7 +275,6 @@ if __name__ == "__main__":
             # Plot the area of the contour (seed) next to the rectangle
 			cv.putText(seedOutput, "{}: {}".format(str(contour_area), radius), (x, y), cv.FONT_HERSHEY_SIMPLEX, 1,(0,0,0), 4, cv.LINE_AA)                 
             
-                     
-	cv.imwrite("{}\SeedOutput.png".format(OUTPUT_DIR), seedOutput)
-    
+	writeImg("output.png", seedOutput)
+
 	print(seedCount)    
