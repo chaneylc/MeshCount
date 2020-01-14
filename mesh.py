@@ -1,5 +1,9 @@
 import cv2 as cv
 import numpy as np
+from collections import defaultdict
+import itertools
+import math
+
 
 OUTPUT_DIR = r"C:\Users\marven\Documents\Spring-2020\CIS690"
 
@@ -13,7 +17,7 @@ def threshold(src):
 
     #LAB threshold ranges that was found manually to work with
     #the lightbox
-    L = [(108,138),(0,255),(0,255)]
+    L = [(0,90),(0,255),(0,255)]
 
     #use numpy logical and to find all pixels that satify the LAB range for each channel
     L_range = np.logical_and(L[0][0] < lab[:,:,0], lab[:,:,0] < L[0][1])
@@ -28,6 +32,12 @@ def threshold(src):
 
     #convert the image back to RGB
     rgb = cv.cvtColor(lab, cv.COLOR_LAB2RGB)
+    
+    #gray = cv.cvtColor(rgb, cv.COLOR_RGB2GRAY)
+    
+    #eroded_rgb = cv.erode(gray, (3,3))
+    
+    #_, bin_img = cv.threshold(eroded_rgb, 100, 255, cv.THRESH_BINARY)
 
     #Debug statements to visualize the image outpu
     cv.imwrite("{}\Mesh.jpg".format(OUTPUT_DIR), rgb)
@@ -57,29 +67,96 @@ if __name__ == "__main__":
 
 	#read the input file
 	src = cv.imread("{}\IMG.jpg".format(OUTPUT_DIR))
+    
+	src_copy = src.copy()
+    
 
 	#create a mask image 'dst' of the mesh
-	dst = threshold(src)
-
+	dst = threshold(src)    
+    
 	#subtract the mesh from the original using opencv saturation subtract
 	sub = cv.subtract(dst, src)
 
 	cv.imwrite("{}\Subtracted.jpg".format(OUTPUT_DIR), sub)
+    
+	rep_sub = replaceChannelValue(sub, 2, 0, 255, 255)    
 
 	#convert the image to grayscale
-	gray = cv.cvtColor(sub, cv.COLOR_RGB2GRAY)
+	gray = cv.cvtColor(rep_sub, cv.COLOR_RGB2GRAY)
+    
+	cv.imwrite("{}\gray_scale.jpg".format(OUTPUT_DIR), gray)
+    
 
 	#final threshold on gray image to segment seeds from background and mesh mask
-	ret, gray = cv.threshold(gray, 100, 255, cv.THRESH_BINARY)
+	#ret, gray = cv.threshold(gray, 100, 255, cv.THRESH_BINARY)
 
-	cv.imwrite("{}\Threshed.jpg".format(OUTPUT_DIR), gray)
+	#cv.imwrite("{}\Threshed.jpg".format(OUTPUT_DIR), gray)
+    
+	#color = cv.cvtColor(gray,cv.COLOR_GRAY2RGB)    
         
 	#find contours, area threshold, count
-	edged = cv.Canny(gray, 30, 200)       
-	cv.imshow('canny edge', edged)
-	cv.waitKey(0)    
-	contours, hierarchy = cv.findContours(edged,cv.RETR_TREE,cv.CHAIN_APPROX_SIMPLE)
-	cv.drawContours(edged, contours, -1, (0, 255, 0), 3)
-	cv.imshow('contours', edged)
-	cv.waitKey(0)    
-	cv.imwrite("{}\Threshed_Contours.jpg".format(OUTPUT_DIR), edged)    
+	edges = cv.Canny(gray, threshold1=240, threshold2=255)
+    
+	edges_smoothed = cv.GaussianBlur(edges, ksize=(5,5), sigmaX=10)
+    
+	kernel = np.ones((5,5), np.uint8) 
+    
+	#edges_smoothed = cv.erode(edges_smoothed, kernel) 
+    
+	edges_smoothed = cv.morphologyEx(edges_smoothed, cv.MORPH_CLOSE, kernel)
+    
+	orig_edges_smoothed = edges_smoothed.copy()  
+    
+    
+    
+	contours, hierarchy = cv.findContours(edges_smoothed,cv.RETR_TREE,cv.CHAIN_APPROX_SIMPLE)
+    
+	contourCount = 0
+    
+	centerMap = defaultdict(int)
+        
+    
+	for contour in contours:
+        
+		perimeter = cv.arcLength(contour, True)
+                
+		if(cv.contourArea(contour) > 1000):   
+                    
+			cv.drawContours(edges_smoothed, [contour], -1, (255, 255, 255), 3)
+            
+			(x,y),radius = cv.minEnclosingCircle(contour)
+
+			center = (int(x), int(y))
+                        
+			centerMap[center] = contour
+            
+			contourCount += 1                                
+    
+	#cv.imwrite("{}\init_contours.jpg".format(OUTPUT_DIR), edges_smoothed)     
+    
+
+    
+	res = cv.subtract(edges_smoothed, orig_edges_smoothed)
+    
+	res_copy = res.copy()    
+    
+	cv.imwrite("{}\subtract_res.jpg".format(OUTPUT_DIR), res)     
+    
+	for a, b in itertools.combinations(centerMap.keys(), 2):
+		dist = math.sqrt( (a[0] - a[1])**2 + (b[0] - b[1])**2 )
+		print(dist)
+        if(dist < 1000 and a in centerMap.keys()):
+			del centerMap[a]            
+    
+	#for cnt in centerMap.keys():    
+		#cv.drawContours(orig_edges_smoothed, [centerMap[cnt]], -1, (255, 255, 255), 3) 
+        
+		#orig_edges_smoothed = cv.dilate(orig_edges_smoothed, (3, 3), iterations = 2)    
+        
+        
+	final = cv.subtract(res, orig_edges_smoothed)        
+                  
+    #res = cv.dilate(res, (5, 5), iterations = 5)     
+
+	cv.imwrite("{}\Threshed_Contours.jpg".format(OUTPUT_DIR), final)
+	cv.imwrite("{}\orig_edges_smoothed.jpg".format(OUTPUT_DIR), res_copy)       

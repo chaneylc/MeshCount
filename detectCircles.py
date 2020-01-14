@@ -17,6 +17,7 @@ def threshold(src):
     #LAB threshold ranges that was found manually to work with
     #the lightbox
     L = [(0,44),(0,255),(0,255)]
+    
 
     #use numpy logical and to find all pixels that satify the LAB range for each channel
     L_range = np.logical_and(L[0][0] < lab[:,:,0], lab[:,:,0] < L[0][1])
@@ -70,7 +71,7 @@ def circleDetect(src):
 	    cv.line(img_lines, pt1=(x_1,y_1), pt2=(x_2,y_2), color=(255,0,0), thickness=2)
 	return img_lines
 
-def circularity(area, perimeter):
+def  circularity(area, perimeter):
 
 	return 4 * (math.pi) * (area / (perimeter**2))
 
@@ -116,7 +117,7 @@ if __name__ == "__main__":
 		circularities = []
 
 		for k in coinKeys:
-
+            
 			contour = areaMap[k]
 
 			perimeter = cv.arcLength(contour, True)
@@ -156,7 +157,8 @@ if __name__ == "__main__":
 			cX = int(M["m10"] / M["m00"])
 			cY = int(M["m01"] / M["m00"])
 
-            # Setting the epsilon calculation to 0.0001 since it gives the most precise   #approximation value. Going lower doesn't improve the precision of the values anymore.
+            # Setting the epsilon calculation to 0.0001 since it gives the most precise   
+            #approximation value. Going lower doesn't improve the precision of the values anymore.
 			approx = cv.approxPolyDP(contour,0.0001*perimeter,True)
             
 			print("appr: {}".format(len(approx)))            
@@ -166,6 +168,10 @@ if __name__ == "__main__":
 			if circularity >= 0.8:
 				cv.putText(output,"{} : {}".format(str(circularity)[:5], area),(cX,cY-500), cv.FONT_HERSHEY_SIMPLEX, 4,(0,0,0),4,cv.LINE_AA)
 				cv.drawContours(output, [approx], -1, (255,0,0), 2)
+                
+				x,y,w,h = cv.boundingRect(contours[0])
+				cv.rectangle(output,(x,y),(x+w,y+h),(0,255,0),2)
+                
 	# circles = cv.HoughCircles(edges_smoothed,cv.HOUGH_GRADIENT,1,100,
  #                            param1=500,param2=30,minRadius=200,maxRadius=200)
 
@@ -198,4 +204,45 @@ if __name__ == "__main__":
 
 	# cv.imwrite("{}/Threshed.jpg".format(OUTPUT_DIR), gray)
 
-	# #find contours, area threshold, count
+	#find contours, area threshold, count
+    
+	# Ignore the first 4 sorted keys since we assume that the first 4 keys correspond to the coins    
+	seedKeys = sortedKeys[4:]
+    
+    # Create a copy of the source since drawContours() modifies the source image
+	seedOutput = src.copy()
+    
+	seedCount = 0    
+    
+	for k in seedKeys:
+        
+		contour = areaMap[k]
+        
+		contour_area = cv.contourArea(contour)
+        
+        # Grab all contours whose area is over 5000 to ignore any noise that might have been identified as seeds
+		if(contour_area > 5000):
+            
+			seedCount += 1
+
+			cv.drawContours(seedOutput, [contour], -1, [255, 0, 0], 2)
+            
+            # identify the co-oridinates to draw a bounding rectangle around the identified contours
+			x, y, w, h = cv.boundingRect(contour)
+            
+            # Draw a bounding rectangle around the identified contours
+			cv.rectangle(seedOutput, (x, y), (x + w, y + h), (0, 255, 0), 2)   
+            
+			M = cv.moments(contour)            
+			cx = int(M['m10']/M['m00'])
+			cy= int(M['m01']/M['m00'])  
+            
+			radius = math.sqrt(contour_area/ math.pi)            
+            
+            # Plot the area of the contour (seed) next to the rectangle
+			cv.putText(seedOutput, "{}: {}".format(str(contour_area), radius), (x, y), cv.FONT_HERSHEY_SIMPLEX, 1,(0,0,0), 4, cv.LINE_AA)                 
+            
+                     
+	cv.imwrite("{}\SeedOutput.png".format(OUTPUT_DIR), seedOutput)
+    
+	print(seedCount)    
