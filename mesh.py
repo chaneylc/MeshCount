@@ -16,7 +16,7 @@ def threshold(src):
 
     #LAB threshold ranges that was found manually to work with
     #the lightbox
-    L = [(0,108),(0,255),(0,255)]
+    L = [(0,71),(0,255),(0,255)]
 
     #use numpy logical and to find all pixels that satify the LAB range for each channel
     L_range = np.logical_and(L[0][0] < lab[:,:,0], lab[:,:,0] < L[0][1])
@@ -65,7 +65,7 @@ def replaceChannelValue(src, channelIndex, lo, hi, value):
 if __name__ == "__main__":
 
 	#read the input file
-	src = cv.imread("{}/Mesh_IMG.jpg".format(OUTPUT_DIR))
+	src = cv.imread("{}/IMG_G6.jpg".format(OUTPUT_DIR))
     
 	src_copy = src.copy()
     
