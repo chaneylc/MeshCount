@@ -305,12 +305,12 @@ if __name__ == "__main__":
             for i, hier in enumerate(hierarchy[0]):
                
                 if hier[3] == index:
-                  
-                    childArea = cv2.contourArea(contours[i])
+                                      
+                        childArea = cv2.contourArea(contours[i])
 
-                    if childArea > gtAvgArea*.25:
-                     
-                        new_parents.append(contours[i])
+                        if childArea > gtAvgArea*.25:
+                         
+                            new_parents.append(contours[i])
                         
 
     #countingmethod to estimate total count based on total area of children
