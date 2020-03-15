@@ -82,8 +82,13 @@ def findGroundTruths(img):
     gray = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
     
     gray = cv2.GaussianBlur(gray, sigmaX=5, ksize=(3,3))
+    
+    cv2.imwrite("gt_img.png", gray)
 
     ret, thresh = cv2.threshold(gray,0,255,cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+    
+    cv2.imwrite("gt_gray.png", thresh)
+
 
     #use a mask to draw all contours that have a certain convexity, attempts to eliminate contours
     #which typically have a very high #contour points / # of convex hull points ratio
@@ -335,9 +340,10 @@ if __name__ == "__main__":
 
             #segment to draw rotated bounding boxes
             rect = cv2.minAreaRect(c)
-            # box = cv2.boxPoints(rect)
-            # box = np.int0(box)
-            #cv2.drawContours(img, [box], 0, (0,0,255), 1)
+            box = cv2.boxPoints(rect)
+            box = np.int0(box)
+            cv2.drawContours(img, [box], 0, (0,0,255), 1)
+            cv2.imwrite('fin_contour.jpg', img)
 
             hull2 = cv2.convexHull(c, returnPoints=False)
 
@@ -382,8 +388,8 @@ if __name__ == "__main__":
                             
 
                             #debug statement to view distribution of defects
-                            #cv2.drawContours(mask, new_parents, index, 255, -1)
-                            #cv2.imwrite("defectmask.jpg", mask)
+                            cv2.drawContours(mask, new_parents, index, 255, -1)
+                            cv2.imwrite("defectmask.jpg", mask)
                             #data = sorted(defVals)
                             #fit = stats.norm.pdf(data, np.mean(data), np.std(data))
                             #print(fit)
